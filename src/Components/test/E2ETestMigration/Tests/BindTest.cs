@@ -3,7 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
-using MegaTestApp;
+using BasicTestApp;
 using Microsoft.AspNetCore.BrowserTesting;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure.ServerFixtures;

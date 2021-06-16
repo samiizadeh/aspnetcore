@@ -5,7 +5,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MegaTestApp.HttpClientTest;
+using BasicTestApp.HttpClientTest;
 using Microsoft.AspNetCore.BrowserTesting;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure.ServerFixtures;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure;
@@ -19,15 +19,15 @@ namespace Microsoft.AspNetCore.Components.E2ETest.Tests
 {
     public class BinaryHttpClientTest : ComponentBrowserTestBase,
         IClassFixture<BasicTestAppServerSiteFixture<CorsStartup>>,
-        IClassFixture<BlazorWasmTestAppFixture<MegaTestApp.Program>>
+        IClassFixture<BlazorWasmTestAppFixture<BasicTestApp.Program>>
     {
-        private readonly BlazorWasmTestAppFixture<MegaTestApp.Program> _devHostServerFixture;
+        private readonly BlazorWasmTestAppFixture<BasicTestApp.Program> _devHostServerFixture;
         readonly ServerFixture _apiServerFixture;
 
         protected override Type TestComponent { get; } = typeof(BinaryHttpRequestsComponent);
 
         public BinaryHttpClientTest(
-            BlazorWasmTestAppFixture<MegaTestApp.Program> devHostServerFixture,
+            BlazorWasmTestAppFixture<BasicTestApp.Program> devHostServerFixture,
             BasicTestAppServerSiteFixture<CorsStartup> apiServerFixture,
             ITestOutputHelper output)
             : base(output)
