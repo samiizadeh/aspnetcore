@@ -50,7 +50,8 @@ namespace CodeGenerator
                 "IHttpMinResponseDataRateFeature",
                 "IHttpBodyControlFeature",
                 "IHttpRequestBodyDetectionFeature",
-                "IHttpResetFeature"
+                "IHttpResetFeature",
+                "IPersistentStateFeature"
             };
 
             var allFeatures = alwaysFeatures

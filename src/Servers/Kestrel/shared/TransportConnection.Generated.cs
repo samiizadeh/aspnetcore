@@ -17,6 +17,7 @@ namespace Microsoft.AspNetCore.Connections
                                                  IConnectionIdFeature,
                                                  IConnectionTransportFeature,
                                                  IConnectionItemsFeature,
+                                                 IPersistentStateFeature,
                                                  IMemoryPoolFeature,
                                                  IConnectionLifetimeFeature
     {
@@ -24,6 +25,7 @@ namespace Microsoft.AspNetCore.Connections
         internal protected IConnectionIdFeature? _currentIConnectionIdFeature;
         internal protected IConnectionTransportFeature? _currentIConnectionTransportFeature;
         internal protected IConnectionItemsFeature? _currentIConnectionItemsFeature;
+        internal protected IPersistentStateFeature? _currentIPersistentStateFeature;
         internal protected IMemoryPoolFeature? _currentIMemoryPoolFeature;
         internal protected IConnectionLifetimeFeature? _currentIConnectionLifetimeFeature;
 
@@ -39,6 +41,7 @@ namespace Microsoft.AspNetCore.Connections
             _currentIConnectionIdFeature = this;
             _currentIConnectionTransportFeature = this;
             _currentIConnectionItemsFeature = this;
+            _currentIPersistentStateFeature = this;
             _currentIMemoryPoolFeature = this;
             _currentIConnectionLifetimeFeature = this;
 
@@ -126,6 +129,10 @@ namespace Microsoft.AspNetCore.Connections
                 {
                     feature = _currentIConnectionItemsFeature;
                 }
+                else if (key == typeof(IPersistentStateFeature))
+                {
+                    feature = _currentIPersistentStateFeature;
+                }
                 else if (key == typeof(IMemoryPoolFeature))
                 {
                     feature = _currentIMemoryPoolFeature;
@@ -161,6 +168,10 @@ namespace Microsoft.AspNetCore.Connections
                 else if (key == typeof(IConnectionItemsFeature))
                 {
                     _currentIConnectionItemsFeature = (IConnectionItemsFeature?)value;
+                }
+                else if (key == typeof(IPersistentStateFeature))
+                {
+                    _currentIPersistentStateFeature = (IPersistentStateFeature?)value;
                 }
                 else if (key == typeof(IMemoryPoolFeature))
                 {
@@ -199,6 +210,10 @@ namespace Microsoft.AspNetCore.Connections
             else if (typeof(TFeature) == typeof(IConnectionItemsFeature))
             {
                 feature = Unsafe.As<IConnectionItemsFeature?, TFeature?>(ref _currentIConnectionItemsFeature);
+            }
+            else if (typeof(TFeature) == typeof(IPersistentStateFeature))
+            {
+                feature = Unsafe.As<IPersistentStateFeature?, TFeature?>(ref _currentIPersistentStateFeature);
             }
             else if (typeof(TFeature) == typeof(IMemoryPoolFeature))
             {
@@ -239,6 +254,10 @@ namespace Microsoft.AspNetCore.Connections
             {
                 _currentIConnectionItemsFeature = Unsafe.As<TFeature?, IConnectionItemsFeature?>(ref feature);
             }
+            else if (typeof(TFeature) == typeof(IPersistentStateFeature))
+            {
+                _currentIPersistentStateFeature = Unsafe.As<TFeature?, IPersistentStateFeature?>(ref feature);
+            }
             else if (typeof(TFeature) == typeof(IMemoryPoolFeature))
             {
                 _currentIMemoryPoolFeature = Unsafe.As<TFeature?, IMemoryPoolFeature?>(ref feature);
@@ -270,6 +289,10 @@ namespace Microsoft.AspNetCore.Connections
             if (_currentIConnectionItemsFeature != null)
             {
                 yield return new KeyValuePair<Type, object>(typeof(IConnectionItemsFeature), _currentIConnectionItemsFeature);
+            }
+            if (_currentIPersistentStateFeature != null)
+            {
+                yield return new KeyValuePair<Type, object>(typeof(IPersistentStateFeature), _currentIPersistentStateFeature);
             }
             if (_currentIMemoryPoolFeature != null)
             {

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Threading;
 using Microsoft.AspNetCore.Connections.Features;
+using Microsoft.AspNetCore.Http.Features;
 
 #nullable enable
 
@@ -17,6 +18,8 @@ namespace Microsoft.AspNetCore.Connections
         // then the list of `features` in the generated code project MUST also be updated first
         // and the code generator re-reun, which will change the interface list.
         // See also: tools/CodeGenerator/TransportConnectionFeatureCollection.cs
+
+        private IDictionary<object, object?>? _persistentState;
 
         MemoryPool<byte> IMemoryPoolFeature.MemoryPool => MemoryPool;
 
@@ -39,5 +42,14 @@ namespace Microsoft.AspNetCore.Connections
         }
 
         void IConnectionLifetimeFeature.Abort() => Abort(new ConnectionAbortedException("The connection was aborted by the application via IConnectionLifetimeFeature.Abort()."));
+
+        IDictionary<object, object?> IPersistentStateFeature.State
+        {
+            get
+            {
+                // Lazily allocate persistent state
+                return _persistentState ?? (_persistentState = new ConnectionItems());
+            }
+        }
     }
 }
