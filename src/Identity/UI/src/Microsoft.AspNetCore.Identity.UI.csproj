@@ -50,16 +50,7 @@
     <ItemGroup>
       <StaticWebAsset Remove="@(StaticWebAsset)" />
 
-      <_V4Content Include="wwwroot\V4\**" />
       <_V5Content Include="wwwroot\V5\**" />
-
-      <StaticWebAsset Include="@(_V4Content->'%(FullPath)')">
-        <SourceType></SourceType>
-        <SourceId>Microsoft.AspNetCore.Identity.UI</SourceId>
-        <ContentRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)wwwroot/V4'))</ContentRoot>
-        <BasePath>/Identity</BasePath>
-        <RelativePath>%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
-      </StaticWebAsset>
 
       <StaticWebAsset Include="@(_V5Content->'%(FullPath)')">
         <SourceType></SourceType>
