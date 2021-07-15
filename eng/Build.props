@@ -44,17 +44,6 @@
                       $(RepoRoot)src\Servers\Kestrel\perf\PlatformBenchmarks\**\*.csproj;
                       $(RepoRoot)src\SignalR\perf\benchmarkapps\**\*.csproj;
                       " />
-
-    <!-- Exclude WinForms and WPF-related projects on non-Windows -->
-    <ProjectToExclude Condition="'$(TargetOsName)' != 'win'"
-                      Include="
-                      $(RepoRoot)src\Components\WebView\Platforms\WindowsForms\**\*.csproj;
-                      $(RepoRoot)src\Components\WebView\Platforms\Wpf\**\*.csproj;
-                      $(RepoRoot)src\Components\WebView\Samples\BlazorWinFormsApp\**\*.csproj;
-                      $(RepoRoot)src\Components\WebView\Samples\BlazorWpfApp\**\*.csproj;
-                      " />
-
->>>>>>> daa1e1ad08 (Update Build.props)
   </ItemGroup>
 
   <Choose>
