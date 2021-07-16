@@ -4,20 +4,20 @@
 namespace Microsoft.AspNetCore.Connections.Features
 {
     /// <summary>
-    /// Explicitly abort one direction of a connection stream.
+    /// Supports aborting one side of a connection stream.
     /// </summary>
     public interface IStreamAbortFeature
     {
         /// <summary>
-        /// Abort reading from the connection stream.
+        /// Abort the read side of the connection stream.
         /// </summary>
-        /// <param name="abortReason">An optional <see cref="ConnectionAbortedException"/> describing the reason to abort reading from the connection stream.</param>
+        /// <param name="abortReason">An optional <see cref="ConnectionAbortedException"/> describing the reason to abort the read side of the connection stream.</param>
         void AbortRead(ConnectionAbortedException abortReason);
 
         /// <summary>
-        /// Abort writing to the connection stream.
+        /// Abort the write side of the connection stream.
         /// </summary>
-        /// <param name="abortReason">An optional <see cref="ConnectionAbortedException"/> describing the reason to abort writing to the connection stream.</param>
+        /// <param name="abortReason">An optional <see cref="ConnectionAbortedException"/> describing the reason to abort the write side of the connection stream.</param>
         void AbortWrite(ConnectionAbortedException abortReason);
     }
 }
