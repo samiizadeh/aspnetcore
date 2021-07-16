@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 {
-    internal class QuicStreamContext : TransportConnection, IStreamDirectionFeature, IProtocolErrorCodeFeature, IStreamIdFeature
+    internal class QuicStreamContext : TransportConnection, IStreamDirectionFeature, IProtocolErrorCodeFeature, IStreamIdFeature, IStreamAbortFeature
     {
         // Internal for testing.
         internal Task _processingTask = Task.CompletedTask;
@@ -310,6 +310,36 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 
             // Cancel ProcessSends loop after calling shutdown to ensure the correct _shutdownReason gets set.
             Output.CancelPendingRead();
+        }
+
+        public void AbortRead(ConnectionAbortedException abortReason)
+        {
+            lock (_shutdownLock)
+            {
+                if (_stream.CanRead)
+                {
+                    _stream.AbortRead(Error);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unable to abort reading from a stream that doesn't support reading.");
+                }
+            }
+        }
+
+        public void AbortWrite(ConnectionAbortedException abortReason)
+        {
+            lock (_shutdownLock)
+            {
+                if (_stream.CanWrite)
+                {
+                    _stream.AbortWrite(Error);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unable to abort writing to a stream that doesn't support writing.");
+                }
+            }
         }
 
         private async ValueTask ShutdownWrite(Exception? shutdownReason)
