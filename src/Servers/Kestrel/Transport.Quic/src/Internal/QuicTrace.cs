@@ -35,6 +35,10 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             LoggerMessage.Define<string>(LogLevel.Debug, new EventId(11, "StreamAborted"), @"Stream id ""{ConnectionId}"" aborted by peer.", SkipEnabledCheckLogOptions);
         private static readonly Action<ILogger, string, string, Exception?> _streamAbort =
             LoggerMessage.Define<string, string>(LogLevel.Debug, new EventId(12, "StreamAbort"), @"Stream id ""{ConnectionId}"" aborted by application because: ""{Reason}"".", SkipEnabledCheckLogOptions);
+        private static readonly Action<ILogger, string, string, Exception?> _streamAbortRead =
+            LoggerMessage.Define<string, string>(LogLevel.Debug, new EventId(13, "StreamAbortRead"), @"Stream id ""{ConnectionId}"" read side aborted by application because: ""{Reason}"".", SkipEnabledCheckLogOptions);
+        private static readonly Action<ILogger, string, string, Exception?> _streamAbortWrite =
+            LoggerMessage.Define<string, string>(LogLevel.Debug, new EventId(14, "StreamAbortWrite"), @"Stream id ""{ConnectionId}"" write side aborted by application because: ""{Reason}"".", SkipEnabledCheckLogOptions);
 
         private readonly ILogger _logger;
 
@@ -143,6 +147,22 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             if (_logger.IsEnabled(LogLevel.Debug))
             {
                 _streamAbort(_logger, streamContext.ConnectionId, reason, null);
+            }
+        }
+
+        public void StreamAbortRead(QuicStreamContext streamContext, string reason)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _streamAbortRead(_logger, streamContext.ConnectionId, reason, null);
+            }
+        }
+
+        public void StreamAbortWrite(QuicStreamContext streamContext, string reason)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _streamAbortWrite(_logger, streamContext.ConnectionId, reason, null);
             }
         }
 

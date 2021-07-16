@@ -318,6 +318,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             {
                 if (_stream.CanRead)
                 {
+                    _log.StreamAbortRead(this, abortReason.Message);
                     _stream.AbortRead(Error);
                 }
                 else
@@ -333,6 +334,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             {
                 if (_stream.CanWrite)
                 {
+                    _log.StreamAbortWrite(this, abortReason.Message);
                     _stream.AbortWrite(Error);
                 }
                 else
