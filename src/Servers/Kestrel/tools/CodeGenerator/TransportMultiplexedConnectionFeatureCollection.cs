@@ -16,7 +16,6 @@ namespace CodeGenerator
                 "IConnectionIdFeature",
                 "IConnectionTransportFeature",
                 "IConnectionItemsFeature",
-                "IPersistentStateFeature",
                 "IMemoryPoolFeature",
                 "IConnectionLifetimeFeature"
             };
@@ -24,7 +23,6 @@ namespace CodeGenerator
             {
                 "IConnectionIdFeature",
                 "IConnectionItemsFeature",
-                "IPersistentStateFeature",
                 "IMemoryPoolFeature",
                 "IConnectionLifetimeFeature"
             };

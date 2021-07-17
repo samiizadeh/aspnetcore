@@ -404,7 +404,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Tests
                 // TODO: Race condition in QUIC library.
                 // Delay between sending streams to avoid
                 // https://github.com/dotnet/runtime/issues/55249
-                await Task.Delay(50);
+                await Task.Delay(100);
                 streamTasks.Add(SendStream(requestState));
             }
 

@@ -132,6 +132,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 
         public void Start()
         {
+            Debug.Assert(_processingTask.IsCompletedSuccessfully);
+
             _processingTask = StartAsync();
         }
 
