@@ -10,6 +10,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
+<RunAnalyzersDuringBuild>false</RunAnalyzersDuringBuild>
+<RunAnalyzersDuringLiveAnalysis>false</RunAnalyzersDuringLiveAnalysis>
+<RunAnalyzers>false</RunAnalyzers>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <AnalysisMode>Default</AnalysisMode>
