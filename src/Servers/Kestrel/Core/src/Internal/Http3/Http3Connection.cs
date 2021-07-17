@@ -269,6 +269,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
                         }
                         else
                         {
+                            var persistentStateFeature = streamContext.Features.Get<IPersistentStateFeature>()!;
+
                             // Request stream
                             UpdateHighestStreamId(streamIdFeature.StreamId);
 
@@ -276,10 +278,10 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
 
                             // Check whether there is an existing HTTP/3 stream on the transport stream.
                             // A stream will only be cached if the transport stream itself is reused.
-                            if (!streamContext.PersistentState.TryGetValue(StreamPersistentStateKey, out var s))
+                            if (!persistentStateFeature.State.TryGetValue(StreamPersistentStateKey, out var s))
                             {
                                 stream = new Http3Stream<TContext>(application, CreateHttpStreamContext(streamContext));
-                                streamContext.PersistentState.Add(StreamPersistentStateKey, stream);
+                                persistentStateFeature.State.Add(StreamPersistentStateKey, stream);
                             }
                             else
                             {

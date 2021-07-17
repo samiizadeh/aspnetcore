@@ -13,30 +13,6 @@ namespace Microsoft.AspNetCore.Connections
     /// </summary>
     public abstract class ConnectionContext : BaseConnectionContext, IAsyncDisposable
     {
-        internal IDictionary<object, object?>? _persistentState;
-
-        /// <summary>
-        /// Gets or sets a key/value collection that can be used to persist state between connections.
-        /// Whether a transport pools and reuses <see cref="ConnectionContext"/> instances and allows state to
-        /// be persisted depends on the transport implementation.
-        /// <para>
-        /// Because values added to persistent state can live in memory until a <see cref="ConnectionContext"/>
-        /// is no longer pooled, use caution with this collection to avoid excessive memory use.
-        /// </para>
-        /// </summary>
-        public virtual IDictionary<object, object?> PersistentState
-        {
-            get
-            {
-                // Lazily allocate connection metadata
-                return _persistentState ?? (_persistentState = new ConnectionItems());
-            }
-            set
-            {
-                _persistentState = value;
-            }
-        }
-
         /// <summary>
         /// Gets or sets the <see cref="IDuplexPipe"/> that can be used to read or write data on this connection.
         /// </summary>
