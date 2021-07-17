@@ -102,6 +102,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             Transport = _originalTransport;
             Application = _originalApplication;
 
+            _transportPipeReader.Reset();
+            _transportPipeWriter.Reset();
+
             _connectionId = null;
             _shutdownReason = null;
             _streamClosed = false;

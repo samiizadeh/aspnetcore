@@ -30,7 +30,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Microbenchmarks
     {
         private Http3InMemory _http3;
         private IHeaderDictionary _httpRequestHeaders;
+        private Http3RequestHeaderHandler _headerHandler;
         private Http3HeadersEnumerator _requestHeadersEnumerator;
+        private Http3FrameWithPayload _httpFrame;
 
         protected abstract Task ProcessRequest(HttpContext httpContext);
 
@@ -41,7 +43,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Microbenchmarks
 
         public virtual void GlobalSetup()
         {
+            _headerHandler = new Http3RequestHeaderHandler();
             _requestHeadersEnumerator = new Http3HeadersEnumerator();
+            _httpFrame = new Http3FrameWithPayload();
 
             _httpRequestHeaders = new HttpRequestHeaders();
             _httpRequestHeaders[HeaderNames.Method] = new StringValues("GET");
@@ -68,15 +72,18 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Microbenchmarks
         {
             _requestHeadersEnumerator.Initialize(_httpRequestHeaders);
 
-            var stream = await _http3.CreateRequestStream();
+            var stream = await _http3.CreateRequestStream(_headerHandler);
 
             await stream.SendHeadersAsync(_requestHeadersEnumerator);
 
             while (true)
             {
-                var frame = await stream.TryReceiveFrameAsync();
+                var frame = await stream.ReceiveFrameAsync(allowEnd: true, frame: _httpFrame);
                 if (frame == null)
                 {
+                    // Tell stream that is can be reset.
+                    stream.Complete();
+
                     return;
                 }
 

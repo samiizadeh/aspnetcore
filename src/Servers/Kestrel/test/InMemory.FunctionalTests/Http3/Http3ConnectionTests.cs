@@ -130,15 +130,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
 
             var controlStream = await Http3.CreateControlStream();
 
-            var frame = new Http3RawFrame();
-            frame.Type = Enum.Parse<Http3FrameType>(frameType);
-            await controlStream.SendFrameAsync(frame, Memory<byte>.Empty);
+            var f = Enum.Parse<Http3FrameType>(frameType);
+            await controlStream.SendFrameAsync(f, Memory<byte>.Empty);
 
             await Http3.WaitForConnectionErrorAsync<Http3ConnectionErrorException>(
                 ignoreNonGoAwayFrames: true,
                 expectedLastStreamId: 0,
                 expectedErrorCode: Http3ErrorCode.UnexpectedFrame,
-                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnControlStream(Http3Formatting.ToFormattedType(frame.Type)));
+                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnControlStream(Http3Formatting.ToFormattedType(f)));
         }
 
         [Fact]

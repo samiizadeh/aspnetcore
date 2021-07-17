@@ -13,11 +13,11 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Internal;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
-using Microsoft.AspNetCore.Testing;
 using Microsoft.Extensions.Primitives;
 using static System.IO.Pipelines.DuplexPipe;
 using Http3SettingType = Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3.Http3SettingType;
@@ -377,7 +377,7 @@ namespace Microsoft.AspNetCore.Testing
             return stream;
         }
 
-        internal ValueTask<Http3RequestStream> CreateRequestStream()
+        internal ValueTask<Http3RequestStream> CreateRequestStream(Http3RequestHeaderHandler headerHandler = null)
         {
             if (!_streamContextPool.TryDequeue(out var testStreamContext))
             {
@@ -385,7 +385,7 @@ namespace Microsoft.AspNetCore.Testing
             }
             testStreamContext.Initialize(GetStreamId(0x00));
 
-            var stream = new Http3RequestStream(this, Connection, testStreamContext);
+            var stream = new Http3RequestStream(this, Connection, testStreamContext, headerHandler ?? new Http3RequestHeaderHandler());
             _runningStreams[stream.StreamId] = stream;
 
             MultiplexedConnectionContext.ToServerAcceptQueue.Writer.TryWrite(stream.StreamContext);
@@ -429,32 +429,27 @@ namespace Microsoft.AspNetCore.Testing
             return FlushAsync(writableBuffer);
         }
 
-        protected static async Task FlushAsync(PipeWriter writableBuffer)
+        protected static Task FlushAsync(PipeWriter writableBuffer)
         {
-            await writableBuffer.FlushAsync().AsTask();
+            return writableBuffer.FlushAsync().GetAsTask();
         }
 
         internal async Task ReceiveEndAsync()
         {
-            var result = await _pair.Application.Input.ReadAsync().AsTask();
+            var result = await _pair.Application.Input.ReadAsync();
             if (!result.IsCompleted)
             {
                 throw new InvalidOperationException("End not received.");
             }
         }
 
-        internal Task<Http3FrameWithPayload> TryReceiveFrameAsync(bool expectEnd = false)
+        internal async ValueTask<Http3FrameWithPayload> ReceiveFrameAsync(bool expectEnd = false, bool allowEnd = false, Http3FrameWithPayload frame = null)
         {
-            return ReceiveFrameAsync(expectEnd, allowEnd: true);
-        }
-
-        internal async Task<Http3FrameWithPayload> ReceiveFrameAsync(bool expectEnd = false, bool allowEnd = false)
-        {
-            var frame = new Http3FrameWithPayload();
+            frame ??= new Http3FrameWithPayload();
 
             while (true)
             {
-                var result = await _pair.Application.Input.ReadAsync().AsTask();
+                var result = await _pair.Application.Input.ReadAsync();
                 var buffer = result.Buffer;
                 var consumed = buffer.Start;
                 var examined = buffer.Start;
@@ -505,11 +500,10 @@ namespace Microsoft.AspNetCore.Testing
             }
         }
 
-        internal async Task SendFrameAsync(Http3RawFrame frame, Memory<byte> data, bool endStream = false)
+        internal async Task SendFrameAsync(Http3FrameType frameType, Memory<byte> data, bool endStream = false)
         {
             var outputWriter = _pair.Application.Output;
-            frame.Length = data.Length;
-            Http3FrameWriter.WriteHeader(frame, outputWriter);
+            Http3FrameWriter.WriteHeader(frameType, data.Length, outputWriter);
 
             if (!endStream)
             {
@@ -549,9 +543,17 @@ namespace Microsoft.AspNetCore.Testing
         }
     }
 
+    internal class Http3RequestHeaderHandler
+    {
+        public readonly byte[] HeaderEncodingBuffer = new byte[64 * 1024];
+        public readonly QPackDecoder QpackDecoder = new QPackDecoder(8192);
+        public readonly Dictionary<string, string> DecodedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
     internal class Http3RequestStream : Http3StreamBase, IHttpHeadersHandler
     {
         private readonly TestStreamContext _testStreamContext;
+        private readonly Http3RequestHeaderHandler _headerHandler;
         private readonly long _streamId;
 
         public bool CanRead => true;
@@ -561,17 +563,15 @@ namespace Microsoft.AspNetCore.Testing
 
         public bool Disposed => _testStreamContext.Disposed;
 
-        private readonly byte[] _headerEncodingBuffer = new byte[64 * 1024];
-        private readonly QPackDecoder _qpackDecoder = new QPackDecoder(8192);
-        protected readonly Dictionary<string, string> _decodedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        public Http3RequestStream(Http3InMemory testBase, Http3Connection connection, TestStreamContext testStreamContext)
+        public Http3RequestStream(Http3InMemory testBase, Http3Connection connection, TestStreamContext testStreamContext, Http3RequestHeaderHandler headerHandler)
             : base(testStreamContext)
         {
             _testBase = testBase;
             _connection = connection;
             _streamId = testStreamContext.StreamId;
             _testStreamContext = testStreamContext;
+            this._headerHandler = headerHandler;
         }
 
         public Task SendHeadersAsync(IEnumerable<KeyValuePair<string, string>> headers, bool endStream = false)
@@ -583,16 +583,14 @@ namespace Microsoft.AspNetCore.Testing
         {
             var headersTotalSize = 0;
 
-            var frame = new Http3RawFrame();
-            frame.PrepareHeaders();
-            var buffer = _headerEncodingBuffer.AsMemory();
+            var buffer = _headerHandler.HeaderEncodingBuffer.AsMemory();
             var done = QPackHeaderWriter.BeginEncode(headers, buffer.Span, ref headersTotalSize, out var length);
             if (!done)
             {
                 throw new InvalidOperationException("Headers not sent.");
             }
 
-            await SendFrameAsync(frame, buffer.Slice(0, length), endStream);
+            await SendFrameAsync(Http3FrameType.Headers, buffer.Slice(0, length), endStream);
         }
 
         internal Http3HeadersEnumerator GetHeadersEnumerator(IEnumerable<KeyValuePair<string, string>> headers)
@@ -610,32 +608,27 @@ namespace Microsoft.AspNetCore.Testing
         {
             // Send HEADERS frame header without content.
             var outputWriter = _pair.Application.Output;
-            var frame = new Http3RawFrame();
-            frame.PrepareData();
-            frame.Length = 10;
-            Http3FrameWriter.WriteHeader(frame, outputWriter);
+            Http3FrameWriter.WriteHeader(Http3FrameType.Data, frameLength: 10, outputWriter);
             await SendAsync(Span<byte>.Empty);
         }
 
         internal async Task SendDataAsync(Memory<byte> data, bool endStream = false)
         {
-            var frame = new Http3RawFrame();
-            frame.PrepareData();
-            await SendFrameAsync(frame, data, endStream);
+            await SendFrameAsync(Http3FrameType.Data, data, endStream);
         }
 
-        internal async Task<Dictionary<string, string>> ExpectHeadersAsync(bool expectEnd = false)
+        internal async ValueTask<Dictionary<string, string>> ExpectHeadersAsync(bool expectEnd = false)
         {
             var http3WithPayload = await ReceiveFrameAsync(expectEnd);
             Http3InMemory.AssertFrameType(http3WithPayload.Type, Http3FrameType.Headers);
 
-            _decodedHeaders.Clear();
-            _qpackDecoder.Decode(http3WithPayload.PayloadSequence, this);
-            _qpackDecoder.Reset();
-            return _decodedHeaders.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, _decodedHeaders.Comparer);
+            _headerHandler.DecodedHeaders.Clear();
+            _headerHandler.QpackDecoder.Decode(http3WithPayload.PayloadSequence, this);
+            _headerHandler.QpackDecoder.Reset();
+            return _headerHandler.DecodedHeaders.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, _headerHandler.DecodedHeaders.Comparer);
         }
 
-        internal async Task<Memory<byte>> ExpectDataAsync()
+        internal async ValueTask<Memory<byte>> ExpectDataAsync()
         {
             var http3WithPayload = await ReceiveFrameAsync();
             return http3WithPayload.Payload;
@@ -643,7 +636,7 @@ namespace Microsoft.AspNetCore.Testing
 
         internal async Task ExpectReceiveEndOfStream()
         {
-            var result = await _pair.Application.Input.ReadAsync().AsTask();
+            var result = await _pair.Application.Input.ReadAsync();
             if (!result.IsCompleted)
             {
                 throw new InvalidOperationException("End of stream not received.");
@@ -652,7 +645,7 @@ namespace Microsoft.AspNetCore.Testing
 
         public void OnHeader(ReadOnlySpan<byte> name, ReadOnlySpan<byte> value)
         {
-            _decodedHeaders[name.GetAsciiStringNonNullCharacters()] = value.GetAsciiOrUTF8StringNonNullCharacters();
+            _headerHandler.DecodedHeaders[name.GetAsciiStringNonNullCharacters()] = value.GetAsciiOrUTF8StringNonNullCharacters();
         }
 
         public void OnHeadersComplete(bool endHeaders)
@@ -662,12 +655,17 @@ namespace Microsoft.AspNetCore.Testing
         public void OnStaticIndexedHeader(int index)
         {
             var knownHeader = H3StaticTable.GetHeaderFieldAt(index);
-            _decodedHeaders[((Span<byte>)knownHeader.Name).GetAsciiStringNonNullCharacters()] = HttpUtilities.GetAsciiOrUTF8StringNonNullCharacters((ReadOnlySpan<byte>)knownHeader.Value);
+            _headerHandler.DecodedHeaders[((Span<byte>)knownHeader.Name).GetAsciiStringNonNullCharacters()] = HttpUtilities.GetAsciiOrUTF8StringNonNullCharacters((ReadOnlySpan<byte>)knownHeader.Value);
         }
 
         public void OnStaticIndexedHeader(int index, ReadOnlySpan<byte> value)
         {
-            _decodedHeaders[((Span<byte>)H3StaticTable.GetHeaderFieldAt(index).Name).GetAsciiStringNonNullCharacters()] = value.GetAsciiOrUTF8StringNonNullCharacters();
+            _headerHandler.DecodedHeaders[((Span<byte>)H3StaticTable.GetHeaderFieldAt(index).Name).GetAsciiStringNonNullCharacters()] = value.GetAsciiOrUTF8StringNonNullCharacters();
+        }
+
+        public void Complete()
+        {
+            _testStreamContext.Complete();
         }
     }
 
@@ -705,7 +703,7 @@ namespace Microsoft.AspNetCore.Testing
             _streamId = testStreamContext.StreamId;
         }
 
-        internal async Task<Dictionary<long, long>> ExpectSettingsAsync()
+        internal async ValueTask<Dictionary<long, long>> ExpectSettingsAsync()
         {
             var http3WithPayload = await ReceiveFrameAsync();
             Http3InMemory.AssertFrameType(http3WithPayload.Type, Http3FrameType.Settings);
@@ -754,25 +752,19 @@ namespace Microsoft.AspNetCore.Testing
 
         internal async Task SendGoAwayAsync(long streamId, bool endStream = false)
         {
-            var frame = new Http3RawFrame();
-            frame.PrepareGoAway();
-
             var data = new byte[VariableLengthIntegerHelper.GetByteCount(streamId)];
             VariableLengthIntegerHelper.WriteInteger(data, streamId);
 
-            await SendFrameAsync(frame, data, endStream);
+            await SendFrameAsync(Http3FrameType.GoAway, data, endStream);
         }
 
         internal async Task SendSettingsAsync(List<Http3PeerSetting> settings, bool endStream = false)
         {
-            var frame = new Http3RawFrame();
-            frame.PrepareSettings();
-
             var settingsLength = CalculateSettingsSize(settings);
             var buffer = new byte[settingsLength];
             WriteSettings(settings, buffer);
 
-            await SendFrameAsync(frame, buffer, endStream);
+            await SendFrameAsync(Http3FrameType.Settings, buffer, endStream);
         }
 
         internal static int CalculateSettingsSize(List<Http3PeerSetting> settings)
@@ -929,6 +921,7 @@ namespace Microsoft.AspNetCore.Testing
         private CompletionPipeWriter _transportPipeWriter;
 
         private bool _isAborted;
+        private bool _isComplete;
 
         public TestStreamContext(bool canRead, bool canWrite, Http3InMemory testBase)
         {
@@ -940,22 +933,36 @@ namespace Microsoft.AspNetCore.Testing
 
         public void Initialize(long streamId)
         {
-            // Create new pipes when test stream context is reused rather than reseting them.
-            // This is required because the client tests read from these directly from these pipes.
-            // When a request is finished they'll check to see whether there is anymore content
-            // in the Application.Output pipe. If it has been reset then that code will error.
-            var inputOptions = Http3InMemory.GetInputPipeOptions(_testBase._serviceContext, _testBase._memoryPool, PipeScheduler.ThreadPool);
-            var outputOptions = Http3InMemory.GetOutputPipeOptions(_testBase._serviceContext, _testBase._memoryPool, PipeScheduler.ThreadPool);
+            if (!_isComplete)
+            {
+                // Create new pipes when test stream context is reused rather than reseting them.
+                // This is required because the client tests read from these directly from these pipes.
+                // When a request is finished they'll check to see whether there is anymore content
+                // in the Application.Output pipe. If it has been reset then that code will error.
+                var inputOptions = Http3InMemory.GetInputPipeOptions(_testBase._serviceContext, _testBase._memoryPool, PipeScheduler.ThreadPool);
+                var outputOptions = Http3InMemory.GetOutputPipeOptions(_testBase._serviceContext, _testBase._memoryPool, PipeScheduler.ThreadPool);
 
-            _inputPipe = new Pipe(inputOptions);
-            _outputPipe = new Pipe(outputOptions);
+                _inputPipe = new Pipe(inputOptions);
+                _outputPipe = new Pipe(outputOptions);
 
-            _transportPipeReader = new CompletionPipeReader(_inputPipe.Reader);
-            _transportPipeWriter = new CompletionPipeWriter(_outputPipe.Writer);
+                _transportPipeReader = new CompletionPipeReader(_inputPipe.Reader);
+                _transportPipeWriter = new CompletionPipeWriter(_outputPipe.Writer);
 
-            _pair = new DuplexPipePair(
-                new DuplexPipe(_transportPipeReader, _transportPipeWriter),
-                new DuplexPipe(_outputPipe.Reader, _inputPipe.Writer));
+                _pair = new DuplexPipePair(
+                    new DuplexPipe(_transportPipeReader, _transportPipeWriter),
+                    new DuplexPipe(_outputPipe.Reader, _inputPipe.Writer));
+            }
+            else
+            {
+                _pair.Application.Input.Complete();
+                _pair.Application.Output.Complete();
+
+                _transportPipeReader.Reset();
+                _transportPipeWriter.Reset();
+
+                _inputPipe.Reset();
+                _outputPipe.Reset();
+            }
 
             Features.Set<IStreamDirectionFeature>(this);
             Features.Set<IStreamIdFeature>(this);
@@ -1012,6 +1019,11 @@ namespace Microsoft.AspNetCore.Testing
             }
 
             return ValueTask.CompletedTask;
+        }
+
+        internal void Complete()
+        {
+            _isComplete = true;
         }
     }
 }

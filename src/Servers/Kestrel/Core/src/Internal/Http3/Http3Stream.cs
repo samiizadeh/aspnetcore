@@ -49,6 +49,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
         private int _totalParsedHeaderSize;
         private bool _isMethodConnect;
 
+        // TODO: Change to resetable ValueTask source
         private TaskCompletionSource? _appCompleted;
 
         private StreamCompletionFlags _completionState;

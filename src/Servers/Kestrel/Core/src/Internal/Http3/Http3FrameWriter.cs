@@ -250,22 +250,22 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
         private void WriteHeaderUnsynchronized()
         {
             _log.Http3FrameSending(_connectionId, _streamIdFeature.StreamId, _outgoingFrame);
-            var headerLength = WriteHeader(_outgoingFrame, _outputWriter);
+            var headerLength = WriteHeader(_outgoingFrame.Type, _outgoingFrame.Length, _outputWriter);
 
             // We assume the payload will be written prior to the next flush.
             _unflushedBytes += headerLength + _outgoingFrame.Length;
         }
 
-        internal static int WriteHeader(Http3RawFrame frame, PipeWriter output)
+        internal static int WriteHeader(Http3FrameType frameType, long frameLength, PipeWriter output)
         {
             // max size of the header is 16, most likely it will be smaller.
             var buffer = output.GetSpan(16);
 
-            var typeLength = VariableLengthIntegerHelper.WriteInteger(buffer, (int)frame.Type);
+            var typeLength = VariableLengthIntegerHelper.WriteInteger(buffer, (int)frameType);
 
             buffer = buffer.Slice(typeLength);
 
-            var lengthLength = VariableLengthIntegerHelper.WriteInteger(buffer, (int)frame.Length);
+            var lengthLength = VariableLengthIntegerHelper.WriteInteger(buffer, (int)frameLength);
 
             var totalLength = typeLength + lengthLength;
             output.Advance(typeLength + lengthLength);

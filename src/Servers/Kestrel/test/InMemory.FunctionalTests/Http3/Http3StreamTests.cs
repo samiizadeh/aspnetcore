@@ -2094,19 +2094,18 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         {
             var requestStream = await Http3.InitializeConnectionAndStreamsAsync(_echoApplication);
 
-            var frame = new Http3RawFrame();
-            frame.Type = Enum.Parse<Http3FrameType>(frameType);
-            await requestStream.SendFrameAsync(frame, Memory<byte>.Empty);
+            var f = Enum.Parse<Http3FrameType>(frameType);
+            await requestStream.SendFrameAsync(f, Memory<byte>.Empty);
 
             await requestStream.WaitForStreamErrorAsync(
                 Http3ErrorCode.UnexpectedFrame,
-                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnRequestStream(frame.FormattedType));
+                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnRequestStream(Http3Formatting.ToFormattedType(f)));
 
             await Http3.WaitForConnectionErrorAsync<Http3ConnectionErrorException>(
                 ignoreNonGoAwayFrames: true,
                 expectedLastStreamId: 8,
                 expectedErrorCode: Http3ErrorCode.UnexpectedFrame,
-                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnRequestStream(frame.FormattedType));
+                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnRequestStream(Http3Formatting.ToFormattedType(f)));
         }
 
         [Theory]
@@ -2115,13 +2114,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
         {
             var requestStream = await Http3.InitializeConnectionAndStreamsAsync(_echoApplication);
 
-            var frame = new Http3RawFrame();
-            frame.Type = Enum.Parse<Http3FrameType>(frameType);
-            await requestStream.SendFrameAsync(frame, Memory<byte>.Empty);
+            var f = Enum.Parse<Http3FrameType>(frameType);
+            await requestStream.SendFrameAsync(f, Memory<byte>.Empty);
 
             await requestStream.WaitForStreamErrorAsync(
                 Http3ErrorCode.UnexpectedFrame,
-                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnServer(frame.FormattedType));
+                expectedErrorMessage: CoreStrings.FormatHttp3ErrorUnsupportedFrameOnServer(Http3Formatting.ToFormattedType(f)));
         }
 
         [Fact]
