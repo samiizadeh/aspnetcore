@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components.RenderTree;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
@@ -308,6 +310,9 @@ namespace Microsoft.AspNetCore.Components.Server.Circuits
                 pendingRenderInfo.TrySetException(new InvalidOperationException(errorMessageOrNull));
             }
         }
+
+        public new ValueTask InitializeJSComponentSupportAsync(JSComponentConfigurationStore configurationStore, JsonSerializerOptions jsonOptions)
+            => base.InitializeJSComponentSupportAsync(configurationStore, jsonOptions);
 
         internal readonly struct UnacknowledgedRenderBatch
         {
