@@ -1,5 +1,5 @@
-// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Generic;
@@ -17,7 +17,6 @@ namespace Microsoft.AspNetCore.Builder
     {
         private readonly WebHostEnvironment _environment;
         private readonly ConfigurationManager _configuration;
-        private readonly Dictionary<string, string?> _settings = new(StringComparer.OrdinalIgnoreCase);
         private readonly IServiceCollection _services;
 
         private readonly WebHostBuilderContext _context;
@@ -66,14 +65,13 @@ namespace Microsoft.AspNetCore.Builder
         /// <inheritdoc />
         public string? GetSetting(string key)
         {
-            _settings.TryGetValue(key, out var value);
-            return value;
+            return _configuration[key];
         }
 
         /// <inheritdoc />
         public IWebHostBuilder UseSetting(string key, string? value)
         {
-            _settings[key] = value;
+            _configuration[key] = value;
 
             // All properties on IWebHostEnvironment are non-nullable.
             if (value is null)
@@ -99,14 +97,6 @@ namespace Microsoft.AspNetCore.Builder
             }
 
             return this;
-        }
-
-        internal void ApplySettings(IWebHostBuilder webHostBuilder)
-        {
-            foreach (var (key, value) in _settings)
-            {
-                webHostBuilder.UseSetting(key, value);
-            }
         }
     }
 }

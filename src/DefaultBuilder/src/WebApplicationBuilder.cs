@@ -1,5 +1,5 @@
-// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics;
 using System.Reflection;
@@ -17,6 +17,8 @@ namespace Microsoft.AspNetCore.Builder
     /// </summary>
     public sealed class WebApplicationBuilder
     {
+        private const string EndpointRouteBuilderKey = "__EndpointRouteBuilder";
+
         private readonly HostBuilder _hostBuilder = new();
         private readonly ConfigureHostBuilder _deferredHostBuilder;
         private readonly ConfigureWebHostBuilder _deferredWebHostBuilder;
@@ -49,6 +51,9 @@ namespace Microsoft.AspNetCore.Builder
 
             // Add default services
             _deferredHostBuilder.ConfigureDefaults(args);
+
+            // Enable changes here because we need to pick up configuration sources added by the generic web host
+            _deferredHostBuilder.ConfigurationEnabled = true;
             _deferredHostBuilder.ConfigureWebHostDefaults(configure: _ => { });
 
             // This is important because GenericWebHostBuilder does the following and we want to preserve the WebHostBuilderContext:
@@ -58,10 +63,6 @@ namespace Microsoft.AspNetCore.Builder
             {
                 _hostBuilder.Properties[key] = value;
             }
-
-            // Configuration changes made by ConfigureDefaults(args) were already picked up by the BootstrapHostBuilder,
-            // so we ignore changes to config until ConfigureDefaults completes.
-            _deferredHostBuilder.ConfigurationEnabled = true;
         }
 
         /// <summary>
@@ -85,13 +86,13 @@ namespace Microsoft.AspNetCore.Builder
         public ILoggingBuilder Logging { get; }
 
         /// <summary>
-        /// An <see cref="IHostBuilder"/> for configuring server specific properties, but not building.
+        /// An <see cref="IWebHostBuilder"/> for configuring server specific properties, but not building.
         /// To build after configuration, call <see cref="Build"/>.
         /// </summary>
         public ConfigureWebHostBuilder WebHost { get; }
 
         /// <summary>
-        /// An <see cref="IWebHostBuilder"/> for configuring host specific properties, but not building.
+        /// An <see cref="IHostBuilder"/> for configuring host specific properties, but not building.
         /// To build after configuration, call <see cref="Build"/>.
         /// </summary>
         public ConfigureHostBuilder Host { get; }
@@ -113,6 +114,13 @@ namespace Microsoft.AspNetCore.Builder
         {
             Debug.Assert(_builtApplication is not null);
 
+            if (context.HostingEnvironment.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            var implicitRouting = false;
+
             // The endpoints were already added on the outside
             if (_builtApplication.DataSources.Count > 0)
             {
@@ -121,49 +129,49 @@ namespace Microsoft.AspNetCore.Builder
                 // destination.UseRouting()
                 // destination.Run(source)
                 // destination.UseEndpoints()
-                if (_builtApplication.RouteBuilder == null)
+
+                // Copy endpoints to the IEndpointRouteBuilder created by an explicit call to UseRouting() if possible.
+                var targetRouteBuilder = GetEndpointRouteBuilder(_builtApplication);
+
+                if (targetRouteBuilder is null)
                 {
+                    // The app defined endpoints without calling UseRouting() explicitly, so call UseRouting() implicitly.
                     app.UseRouting();
 
-                    // Copy the route data sources over to the destination pipeline, this should be available since we just called
-                    // UseRouting()
-                    var routes = (IEndpointRouteBuilder)app.Properties[WebApplication.EndpointRouteBuilder]!;
-
-                    foreach (var ds in _builtApplication.DataSources)
-                    {
-                        routes.DataSources.Add(ds);
-                    }
-
-                    // Chain the execution of the source pipeline into the destination pipeline
-                    app.Use(next =>
-                    {
-                        _builtApplication.Run(next);
-                        return _builtApplication.BuildRequestDelegate();
-                    });
-
-                    // Add a UseEndpoints at the end
-                    app.UseEndpoints(e => { });
+                    // An implicitly created IEndpointRouteBuilder was addeded to app.Properties by the UseRouting() call above.
+                    targetRouteBuilder = GetEndpointRouteBuilder(app)!;
+                    implicitRouting = true;
                 }
-                else
+
+                // Copy the endpoints to the explicitly or implicitly created IEndopintRouteBuilder.
+                foreach (var ds in _builtApplication.DataSources)
                 {
-                    // Since we register routes into the source pipeline's route builder directly,
-                    // if the user called UseRouting, we need to copy the data sources
-                    foreach (var ds in _builtApplication.DataSources)
-                    {
-                        _builtApplication.RouteBuilder.DataSources.Add(ds);
-                    }
+                    targetRouteBuilder.DataSources.Add(ds);
+                }
 
-                    // We then implicitly call UseEndpoints at the end of the pipeline
+                // UseEndpoints consumes the DataSources immediately to populate CompositeEndpointDataSource via RouteOptions,
+                // so it must be called after we copy the endpoints.
+                if (!implicitRouting)
+                {
+                    // UseRouting() was called explicitely, but we may still need to call UseEndpoints() implicitely at
+                    // the end of the pipeline.
                     _builtApplication.UseEndpoints(_ => { });
-
-                    // Wire the source pipeline to run in the destination pipeline
-                    app.Run(_builtApplication.BuildRequestDelegate());
                 }
             }
-            else
+
+            // Wire the source pipeline to run in the destination pipeline
+            app.Use(next =>
             {
-                // Wire the source pipeline to run in the destination pipeline
-                app.Run(_builtApplication.BuildRequestDelegate());
+                _builtApplication.Run(next);
+                return _builtApplication.BuildRequestDelegate();
+            });
+
+            // Implicitly call UseEndpoints() at the end of the pipeline if UseRouting() was called implicitly.
+            // We could add this to the end of _buildApplication instead if UseEndpoints() was not so picky about
+            // being called with the same IApplicationBluilder instance as UseRouting().
+            if (implicitRouting)
+            {
+                app.UseEndpoints(_ => { });
             }
 
             // Copy the properties to the destination app builder
@@ -220,9 +228,14 @@ namespace Microsoft.AspNetCore.Builder
             genericWebHostBuilder.Configure(ConfigureApplication);
 
             _deferredHostBuilder.RunDeferredCallbacks(_hostBuilder);
-            _deferredWebHostBuilder.ApplySettings(genericWebHostBuilder);
 
             _environment.ApplyEnvironmentSettings(genericWebHostBuilder);
+        }
+
+        private static IEndpointRouteBuilder? GetEndpointRouteBuilder(IApplicationBuilder app)
+        {
+            app.Properties.TryGetValue(EndpointRouteBuilderKey, out var value);
+            return (IEndpointRouteBuilder?)value;
         }
 
         private class LoggingBuilder : ILoggingBuilder

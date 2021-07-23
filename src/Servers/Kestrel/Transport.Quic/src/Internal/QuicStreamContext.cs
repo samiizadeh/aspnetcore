@@ -1,5 +1,5 @@
-// Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Buffers;
@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 {
-    internal class QuicStreamContext : TransportConnection, IStreamDirectionFeature, IProtocolErrorCodeFeature, IStreamIdFeature, IPooledStream
+    internal partial class QuicStreamContext : TransportConnection, IStreamDirectionFeature, IProtocolErrorCodeFeature, IStreamIdFeature, IPooledStream
     {
         // Internal for testing.
         internal Task _processingTask = Task.CompletedTask;
@@ -87,12 +87,16 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             }
 
             ConnectionClosed = _streamClosedTokenSource.Token;
+
+            // TODO - add to generated features
             Features.Set<IStreamDirectionFeature>(this);
             Features.Set<IProtocolErrorCodeFeature>(this);
             Features.Set<IStreamIdFeature>(this);
-
             // TODO populate the ITlsConnectionFeature (requires client certs).
             Features.Set<ITlsConnectionFeature>(new FakeTlsConnectionFeature());
+
+            InitializeFeatures();
+
             CanRead = _stream.CanRead;
             CanWrite = _stream.CanWrite;
             Error = 0;
@@ -132,6 +136,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 
         public void Start()
         {
+            Debug.Assert(_processingTask.IsCompletedSuccessfully);
+
             _processingTask = StartAsync();
         }
 
