@@ -1,0 +1,56 @@
+﻿@page
+
+<component type="typeof(ComponentWithParameters)"
+           render-mode="ServerPrerendered"
+           param-Param1="ComponentWithParameters.TestModelValues"
+           param-Param2="ComponentWithParameters.DerivedModelValue"
+           param-key2="43" />
+
+@*
+    So that E2E tests can make assertions about both the browser WebSocket support
+    we only load the .js file when told to.
+*@
+<hr />
+
+<!-- <div id="blazor-error-ui">
+    An unhandled exception has occurred. See browser dev tools for details.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div> -->
+
+<button id="startNormally" onclick="startNormally()">Start Normally</button>
+<button id="startWithWebSocketsDisabledInBrowser" onclick="startWithWebSocketsDisabledInBrowser()">Start with WebSockets Disabled in Browser</button>
+<button id="startWithLongPolling" onclick="startWithLongPolling()">Start With Long Polling</button>
+
+<script src="_framework/blazor.server.js" autostart="false"></script>
+<script>
+    function startNormally() {
+        Blazor.start({
+            logLevel: 1 // LogLevel.Debug
+        });
+    }
+
+    function startWithWebSocketsDisabledInBrowser() {
+        WebSocket = null; // emulates browsers which don't support WebSockets
+        startNormally();
+    }
+
+    function startWithLongPolling() {
+        Blazor.start({
+            logLevel: 1, // LogLevel.Debug
+            configureSignalR: builder => {
+                builder.configureLogging("debug") // LogLevel.Debug
+                    .withUrl('_blazor', 4) // Long Polling
+            }
+        });
+    }
+
+    function getErrorText() {
+        let errorUi = document.querySelector('#blazor-error-ui') as HTMLElement;
+        if (errorUi) {
+            return errorUi.firstChild.textContent;
+        }
+
+        return "Unable to find error ui";
+    }
+</script>
